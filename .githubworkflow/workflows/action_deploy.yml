@@ -1,0 +1,30 @@
+name: Deploy Static Website to EC2
+
+on:
+  push:
+    branches:
+      - main  # ya master, jo bhi branch tum use karte ho
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy files to EC2
+        run: |
+          rsync -avz --delete ./ ec2-user@${{ secrets.EC2_HOST }}:/tmp/site-files
+          ssh ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+            sudo rm -rf /usr/share/nginx/html/*
+            sudo cp -r /tmp/site-files/* /usr/share/nginx/html/
+            sudo systemctl restart nginx
+          EOF
